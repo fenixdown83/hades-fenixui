@@ -1,0 +1,373 @@
+From 7a0402943a45672bf739ee8cb4814c57b3f1388b Mon Sep 17 00:00:00 2001
+From: Fenix
+Date: Sun, 11 Oct 2020 06:39:21 -0500
+Subject: [PATCH] FenixUI Mod
+
+---
+ RoomEvents.lua       |   2 +
+ RoomManager.lua      |  18 +++++
+ RunManager.lua       |   5 ++
+ TraitTrayScripts.lua |  17 +++--
+ UIData.lua           |  21 +++++-
+ UIScripts.lua        | 175 ++++++++++++++++++++++++++++++++++++++++++-
+ 6 files changed, 227 insertions(+), 11 deletions(-)
+
+diff --git a/RoomEvents.lua b/RoomEvents.lua
+index ac5868f..e4680b8 100644
+--- a/RoomEvents.lua
++++ b/RoomEvents.lua
+@@ -393,6 +393,8 @@ function HandleThanatosSpawn( eventSource )
+ 	SetupAI( CurrentRun, newUnit )
+ 
+ 	currentRun.ThanatosSpawns = currentRun.ThanatosSpawns + 1
++	-- FENIX
++	UpdateThanatosUI( CurrentRun.ThanatosSpawns )
+ 
+ end
+ 
+diff --git a/RoomManager.lua b/RoomManager.lua
+index b622c61..2d80195 100644
+--- a/RoomManager.lua
++++ b/RoomManager.lua
+@@ -1873,6 +1873,24 @@ function StartRoom( currentRun, currentRoom )
+ 
+ 	DebugPrint({ Text = "StartRoom: "..currentRoom.Name.." (RunDepth = "..currentRun.RunDepthCache..")".." (BiomeDepth = "..currentRun.BiomeDepthCache..")".." (Seed = "..GetGlobalRng().seed..")" })
+ 
++	-- FENIX
++	if currentRoom.Name == "RoomSecret01" or currentRoom.Name == "RoomSecret02" or currentRoom.Name == "RoomSecret03" then
++		currentRun.ChaosSpawns = currentRun.ChaosSpawns + 1
++		UpdateChaosIcon( CurrentRun.ChaosSpawns )
++	end
++
++	-- FENIX
++	if currentRoom.Name == "A_Story01" or currentRoom.Name == "B_Story01" or currentRoom.Name == "C_Story01" then
++		currentRun.StorySpawns = currentRun.StorySpawns + 1
++		UpdateChaosIcon( CurrentRun.StorySpawns )
++	end
++
++	-- FENIX
++	if currentRoom.Name == "A_Reprieve01" or currentRoom.Name == "B_Reprieve01" or currentRoom.Name == "C_Reprieve01" then
++		currentRun.ReprieveSpawns = currentRun.ReprieveSpawns + 1
++		UpdateChaosIcon( CurrentRun.ReprieveSpawns )
++	end
++
+ 	local previousRoom = GetPreviousRoom(currentRun)
+ 	if previousRoom ~= nil and previousRoom.StartTime ~= nil then
+ 		local timeInPrev = _worldTime - previousRoom.StartTime
+diff --git a/RunManager.lua b/RunManager.lua
+index 86163f0..a1b6a25 100644
+--- a/RunManager.lua
++++ b/RunManager.lua
+@@ -282,6 +282,11 @@ function StartNewRun( prevRun, args )
+ 	CurrentRun.ActiveBiomeTimer = GetNumMetaUpgrades("BiomeSpeedShrineUpgrade") > 0
+ 	CurrentRun.NumRerolls = GetNumMetaUpgrades( "RerollMetaUpgrade" ) + GetNumMetaUpgrades("RerollPanelMetaUpgrade")
+ 	CurrentRun.ThanatosSpawns = 0
++	-- FENIX
++	CurrentRun.ChaosSpawns = 0
++	CurrentRun.StorySpawns = 0
++	CurrentRun.ReprieveSpawns = 0
++	--
+ 	CurrentRun.SupportAINames = {}
+ 	CurrentRun.Hero.TargetMetaRewardsAdjustSpeed = 10.0
+ 	CurrentRun.ClosedDoors = {}
+diff --git a/TraitTrayScripts.lua b/TraitTrayScripts.lua
+index b1ba716..19eb56c 100644
+--- a/TraitTrayScripts.lua
++++ b/TraitTrayScripts.lua
+@@ -1,15 +1,18 @@
+-﻿function ShowDepthCounter()
++﻿-- FENIX
++function ShowDepthCounter()
+ 	if CurrentRun.CurrentRoom and CurrentRun.CurrentRoom.HideEncounterText then
+ 		return
+ 	end
+ 	if ScreenAnchors.RunDepthId == nil and not CurrentRun.Hero.IsDead then
+ 		ScreenAnchors.RunDepthId = CreateScreenObstacle({ Name = "BlankObstacle", X = UIData.CurrentRunDepth.X, Y = UIData.CurrentRunDepth.Y, Group = "Combat_Menu_Overlay" })
++		ScreenAnchors.FenixDebug = CreateScreenObstacle({ Name = "BlankObstacle", X = UIData.FenixDebug.X, Y = UIData.FenixDebug.Y, Group = "Combat_Menu_Overlay" })
+ 	end
+-	local text = "CurrentRunDepth"
+-	if CurrentRun.RunDepthCache >= 2 then
+-		text = "CurrentRunDepth_Plural"
+-	end
+-	CreateTextBox( MergeTables( UIData.CurrentRunDepth.TextFormat, { Id = ScreenAnchors.RunDepthId, Text = text, } ) )
++	
++	local depth = "chamber: "..GetRunDepth(CurrentRun)
++	local debug = "room: "..CurrentRun.CurrentRoom.Name.."  |  seed = "..GetGlobalRng().seed
++	
++	CreateTextBox( MergeTables( UIData.CurrentRunDepth.TextFormat, { Id = ScreenAnchors.RunDepthId, Text = depth, } ) )
++	CreateTextBox( MergeTables( UIData.FenixDebug.TextFormat, { Id = ScreenAnchors.FenixDebug, Text = debug, } ) )
+ 	ModifyTextBox({ Id = ScreenAnchors.RunDepthId, FadeTarget = 0, FadeDuration = 0.0 })
+ 	ModifyTextBox({ Id = ScreenAnchors.RunDepthId, FadeTarget = 1, FadeDuration = 0.1 })
+ end
+@@ -501,7 +504,7 @@ function CloseAdvancedTooltipScreen()
+ 	SetConfigOption({ Name = "FreeFormSelectWrapY", Value = false })
+ 	SetConfigOption({ Name = "ExclusiveInteractGroup", Value = nil })
+ 	SetConfigOption({ Name = "FreeFormSelectStepDistance", Value = 16.0 })
+-	HideDepthCounter()
++	-- HideDepthCounter()
+ 	SetAdvancedTooltipMixing( 0 )
+ 	ScreenAnchors.TraitTrayScreen = nil
+ 	if not CurrentRun.Hero.IsDead then
+diff --git a/UIData.lua b/UIData.lua
+index 875cee5..d040886 100644
+--- a/UIData.lua
++++ b/UIData.lua
+@@ -2543,7 +2543,7 @@ UIData =
+ 
+ 	CurrentRunDepth =
+ 	{
+-		X = 1740,
++		X = 1905,
+ 		Y = 30,
+ 		TextFormat =
+ 		{
+@@ -2555,6 +2555,23 @@ UIData =
+ 			FontSize = 20,
+ 			TextSymbolScale = 0.8,
+ 		}
++	},
++
++	-- FENIX
++	FenixDebug =
++	{
++		X = 30,
++		Y = 30,
++		TextFormat =
++		{
++			Justification = "Left",
++			ShadowBlur = 0, ShadowColor = {0,0,0,1}, ShadowOffset = {0, 5},
++			OutlineThickness = 3, OutlineColor = {0.0, 0.0, 0.0,1},
++			Color = {220, 220, 220, 255},
++			Font = "AlegreyaSansSCBold",
++			FontSize = 20,
++			TextSymbolScale = 0.8,
++		}
+ 	}
+ 
+ }
+@@ -2637,7 +2654,7 @@ TraitUI =
+ ConsumableUI =
+ {
+ 	StartY = ScreenHeight - 30,
+-	SpacerY = 50,
++	SpacerY = 42,
+ 	StartX = ScreenWidth - 30,
+ 	SpacerX = 0,
+ 	FloatingCountSpacerX = -120
+diff --git a/UIScripts.lua b/UIScripts.lua
+index ec334ac..05fd316 100644
+--- a/UIScripts.lua
++++ b/UIScripts.lua
+@@ -149,6 +149,10 @@ function ShowCombatUI( flag )
+ 		return
+ 	end
+ 
++	if ScreenAnchors.RunDepthId == nil then
++		ShowDepthCounter()
++	end
++
+ 	if not ConfigOptionCache.ShowUIAnimations then
+ 		return
+ 	end
+@@ -200,6 +204,10 @@ function ShowResourceUIs( args )
+ 	end
+ 
+ 	local offsetY = ConsumableUI.StartY
++	
++	-- FENIX
++	ShowFenixUI()
++	
+ 	if CurrentRun.Money > 0 or ScreenAnchors.MoneyIcon ~= nil then
+ 		ShowMoneyUI( offsetY )
+ 		offsetY = offsetY - ConsumableUI.SpacerY
+@@ -288,6 +296,8 @@ function HideCombatUI( flag, args )
+ 	thread(HideTraitUI)
+ 	thread(HideMoneyUI)
+ 	thread(HideRerollUI)
++	-- FENIX
++	thread(HideFenixUI)
+ 	HideResourceUIs()
+ 
+ 	thread(HideSuperMeter)
+@@ -733,6 +743,169 @@ function UpdateRerollUI( newValue )
+ 	ModifyTextBox({ Id = ScreenAnchors.Reroll, Text = newValue, AutoSetDataProperties = false, })
+ end
+ 
++-- FENIX
++function ShowFenixUI()
++	if not ConfigOptionCache.ShowUIAnimations or not ShowingCombatUI then
++		return
++	end
++	if ScreenAnchors.ThanatosIcon ~= nil then
++		-- Already visible
++		return
++	end
++	if ScreenAnchors.ChaosIcon ~= nil then
++		-- Already visible
++		return
++	end
++	if ScreenAnchors.StoryIcon ~= nil then
++		-- Already visible
++		return
++	end
++	if ScreenAnchors.ReprieveIcon ~= nil then
++		-- Already visible
++		return
++	end
++
++	local offsetY = 110
++	local spacerY = 45
++	ScreenAnchors.ChaosIcon = CreateScreenObstacle({ Name = "BlankObstacle", Group = "Combat_UI", X = 1915, Y = offsetY})
++	offsetY = offsetY + spacerY
++	ScreenAnchors.StoryIcon = CreateScreenObstacle({ Name = "BlankObstacle", Group = "Combat_UI", X = 1915, Y = offsetY})
++	offsetY = offsetY + spacerY
++	ScreenAnchors.ReprieveIcon = CreateScreenObstacle({ Name = "BlankObstacle", Group = "Combat_UI", X = 1915, Y = offsetY})
++	offsetY = offsetY + spacerY
++	ScreenAnchors.ThanatosIcon = CreateScreenObstacle({ Name = "BlankObstacle", Group = "Combat_UI", X = 1915, Y = offsetY})
++
++	SetAnimation({ Name = "ChaosPreview", DestinationId = ScreenAnchors.ChaosIcon, PlaySpeed = 0})
++	SetScale({ Id = ScreenAnchors.ChaosIcon, StartFrameFraction = 1, Fraction = 0.5, Duration = 0})
++
++	SetAnimation({ Name = "StoryPreview", DestinationId = ScreenAnchors.StoryIcon, PlaySpeed = 0})
++	SetScale({ Id = ScreenAnchors.StoryIcon, StartFrameFraction = 1, Fraction = 0.4, Duration = 0})
++	
++	SetAnimation({ Name = "MirrorIcon_DoorHeal", DestinationId = ScreenAnchors.ReprieveIcon, PlaySpeed = 0})
++	SetScale({ Id = ScreenAnchors.ReprieveIcon, StartFrameFraction = 1, Fraction = 0.8, Duration = 0})
++
++	SetAnimation({ Name = "Keepsake_Butterfly", DestinationId = ScreenAnchors.ThanatosIcon })
++	SetScale({ Id = ScreenAnchors.ThanatosIcon, Fraction = 0.2, Duration = 0})
++
++	CreateTextBox({ Id = ScreenAnchors.ThanatosIcon, Text = CurrentRun.ThanatosSpawns, OffsetX = -30, OffsetY = -2,
++			Font = "AlegreyaSansSCBold", FontSize = 28, ShadowRed = 0.1, ShadowBlue = 0.1, ShadowGreen = 0.1,
++			OutlineColor = {0.113, 0.113, 0.113, 1}, OutlineThickness = 3,
++			ShadowAlpha = 1.0, ShadowBlur = 0, ShadowOffsetY = 2, ShadowOffsetX = 0, Justification = "Right" })
++
++	CreateTextBox({ Id = ScreenAnchors.ChaosIcon, Text = CurrentRun.ChaosSpawns, OffsetX = -30, OffsetY = -2,
++			Font = "AlegreyaSansSCBold", FontSize = 28, ShadowRed = 0.1, ShadowBlue = 0.1, ShadowGreen = 0.1,
++			OutlineColor = {0.113, 0.113, 0.113, 1}, OutlineThickness = 3,
++			ShadowAlpha = 1.0, ShadowBlur = 0, ShadowOffsetY = 2, ShadowOffsetX = 0, Justification = "Right" })
++
++	CreateTextBox({ Id = ScreenAnchors.StoryIcon, Text = CurrentRun.StorySpawns, OffsetX = -30, OffsetY = -2,
++			Font = "AlegreyaSansSCBold", FontSize = 28, ShadowRed = 0.1, ShadowBlue = 0.1, ShadowGreen = 0.1,
++			OutlineColor = {0.113, 0.113, 0.113, 1}, OutlineThickness = 3,
++			ShadowAlpha = 1.0, ShadowBlur = 0, ShadowOffsetY = 2, ShadowOffsetX = 0, Justification = "Right" })
++		
++	CreateTextBox({ Id = ScreenAnchors.ReprieveIcon, Text = CurrentRun.ReprieveSpawns, OffsetX = -30, OffsetY = -2,
++			Font = "AlegreyaSansSCBold", FontSize = 28, ShadowRed = 0.1, ShadowBlue = 0.1, ShadowGreen = 0.1,
++			OutlineColor = {0.113, 0.113, 0.113, 1}, OutlineThickness = 3,
++			ShadowAlpha = 1.0, ShadowBlur = 0, ShadowOffsetY = 2, ShadowOffsetX = 0, Justification = "Right" })
++
++	FadeObstacleIn({ Id = ScreenAnchors.ThanatosIcon, Duration = CombatUI.FadeInDuration, IncludeText = true, Distance = CombatUI.FadeDistance.Money, Direction = 180 })
++	FadeObstacleIn({ Id = ScreenAnchors.ChaosIcon, Duration = CombatUI.FadeInDuration, IncludeText = true, Distance = CombatUI.FadeDistance.Money, Direction = 180 })
++	FadeObstacleIn({ Id = ScreenAnchors.StoryIcon, Duration = CombatUI.FadeInDuration, IncludeText = true, Distance = CombatUI.FadeDistance.Money, Direction = 180 })
++	FadeObstacleIn({ Id = ScreenAnchors.ReprieveIcon, Duration = CombatUI.FadeInDuration, IncludeText = true, Distance = CombatUI.FadeDistance.Money, Direction = 180 })
++
++end
++
++-- FENIX
++function HideFenixUI()
++	thread(HideThanatosIcon)
++	thread(HideChaosIcon)
++	thread(HideStoryIcon)
++	thread(HideReprieveIcon)
++end
++
++-- FENIX
++function HideThanatosIcon()
++	if ScreenAnchors.ThanatosIcon == nil then
++		return
++	end
++	local id = ScreenAnchors.ThanatosIcon
++	HideObstacle({ Id = id, IncludeText = true, Distance = CombatUI.FadeDistance.ShrinePoint, Angle = 0, Duration = CombatUI.FadeDuration, SmoothStep = true })
++	ScreenAnchors.ThanatosIcon = nil
++
++	wait( CombatUI.FadeDuration, RoomThreadName )
++	Destroy({ Id = id })
++end
++
++-- FENIX
++function HideChaosIcon()
++	if ScreenAnchors.ChaosIcon == nil then
++		return
++	end
++	local id = ScreenAnchors.ChaosIcon
++	HideObstacle({ Id = id, IncludeText = true, Distance = CombatUI.FadeDistance.ShrinePoint, Angle = 0, Duration = CombatUI.FadeDuration, SmoothStep = true })
++	ScreenAnchors.ChaosIcon = nil
++
++	wait( CombatUI.FadeDuration, RoomThreadName )
++	Destroy({ Id = id })
++end
++
++-- FENIX
++function HideStoryIcon()
++	if ScreenAnchors.StoryIcon == nil then
++		return
++	end
++	local id = ScreenAnchors.StoryIcon
++	HideObstacle({ Id = id, IncludeText = true, Distance = CombatUI.FadeDistance.ShrinePoint, Angle = 0, Duration = CombatUI.FadeDuration, SmoothStep = true })
++	ScreenAnchors.StoryIcon = nil
++
++	wait( CombatUI.FadeDuration, RoomThreadName )
++	Destroy({ Id = id })
++end
++
++-- FENIX
++function HideReprieveIcon()
++	if ScreenAnchors.ReprieveIcon == nil then
++		return
++	end
++	local id = ScreenAnchors.ReprieveIcon
++	HideObstacle({ Id = id, IncludeText = true, Distance = CombatUI.FadeDistance.ShrinePoint, Angle = 0, Duration = CombatUI.FadeDuration, SmoothStep = true })
++	ScreenAnchors.ReprieveIcon = nil
++
++	wait( CombatUI.FadeDuration, RoomThreadName )
++	Destroy({ Id = id })
++end
++
++-- FENIX
++function UpdateThanatosUI( newValue )
++	if ScreenAnchors.ThanatosIcon == nil then
++		return
++	end
++	ModifyTextBox({ Id = ScreenAnchors.ThanatosIcon, Text = newValue, AutoSetDataProperties = false, })
++end
++
++-- FENIX
++function UpdateChaosIcon( newValue )
++	if ScreenAnchors.ChaosIcon == nil then
++		return
++	end
++	ModifyTextBox({ Id = ScreenAnchors.ChaosIcon, Text = newValue, AutoSetDataProperties = false, })
++end
++
++-- FENIX
++function UpdateStoryIcon( newValue )
++	if ScreenAnchors.StoryIcon == nil then
++		return
++	end
++	ModifyTextBox({ Id = ScreenAnchors.StoryIcon, Text = newValue, AutoSetDataProperties = false, })
++end
++
++-- FENIX
++function UpdateReprieveIcon( newValue )
++	if ScreenAnchors.ReprieveIcon == nil then
++		return
++	end
++	ModifyTextBox({ Id = ScreenAnchors.ReprieveIcon, Text = newValue, AutoSetDataProperties = false, })
++end
++
+ function ShowMoneyUI( offsetY )
+ 	if not ConfigOptionCache.ShowUIAnimations or not ShowingCombatUI then
+ 		return
+@@ -2819,8 +2992,6 @@ OnControlPressed{ "AdvancedTooltip",
+ 
+ 		if ScreenAnchors.RunDepthId == nil then
+ 			ShowDepthCounter()
+-		else
+-			HideDepthCounter()
+ 		end
+ 
+ 		if ( not IsInputAllowed({}) and not GameState.WaitingForChoice ) or ( CurrentRun ~= nil and CurrentRun.Hero ~= nil and ( IsEmpty( CurrentRun.Hero.Traits ) and GetTotalSpentMetaPoints() == 0 ) ) or ( CurrentDeathAreaRoom ~= nil and CurrentDeathAreaRoom.ShowResourceUIOnly ) then
+-- 
+2.22.0.windows.1
+
